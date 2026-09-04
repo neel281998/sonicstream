@@ -44,7 +44,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       .select('*')
       .eq('id', userId)
       .single();
-    if (data) set({ profile: data as Profile });
+
+    if (data) {
+      const profileData: Profile = { ...(data as Profile) };
+      const user = get().user;
+      const metaArtist =
+        user?.user_metadata?.is_artist === true ||
+        user?.user_metadata?.is_artist === 'true';
+
+      // If user registered with artist mode in user_metadata but profile table has false, sync it
+      if (metaArtist && !profileData.is_artist) {
+        profileData.is_artist = true;
+        try {
+          await supabase
+            .from('profiles')
+            .update({ is_artist: true })
+            .eq('id', userId);
+
+          const { ensureArtistForUser } = await import('@/services/artist');
+          await ensureArtistForUser(userId, profileData.username || undefined);
+        } catch (err: any) {
+          console.warn('[authStore] is_artist sync notice:', err?.message);
+        }
+      } else if (profileData.is_artist) {
+        import('@/services/artist').then(({ ensureArtistForUser }) => {
+          ensureArtistForUser(userId, profileData.username || undefined).catch(() => {});
+        }).catch(() => {});
+      }
+
+      set({ profile: profileData });
+    }
   },
 
   signOut: async () => {

@@ -40,29 +40,50 @@ export default function SignUpScreen() {
       return;
     }
     setLoading(true);
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          username: username.trim(),
+          is_artist: isArtist,
+        },
+      },
+    });
+
     if (error) {
       Alert.alert('Sign Up Failed', error.message);
       setLoading(false);
       return;
     }
 
-    // Trigger auto-creates profile — update with chosen username / artist flag
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ username, is_artist: isArtist })
-        .eq('id', data.user.id);
+    // If session is immediately available, update profile directly
+    if (data.user && data.session) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({ username: username.trim(), is_artist: isArtist })
+          .eq('id', data.user.id);
 
-      if (profileError) {
-        console.warn('[sign-up] profile update error:', profileError.message);
+        if (isArtist) {
+          const { ensureArtistForUser } = await import('@/services/artist');
+          await ensureArtistForUser(data.user.id, username.trim());
+        }
+      } catch (profileError: any) {
+        console.warn('[sign-up] profile update notice:', profileError?.message);
       }
     }
 
     setLoading(false);
-    Alert.alert('Check your email', 'We sent a confirmation link. Please verify your email to continue.', [
-      { text: 'OK', onPress: () => router.replace('/(auth)/sign-in') },
-    ]);
+    if (data.session) {
+      router.replace('/(tabs)');
+    } else {
+      Alert.alert(
+        'Account Created',
+        'Please check your email to verify your account, then sign in.',
+        [{ text: 'OK', onPress: () => router.replace('/(auth)/sign-in') }]
+      );
+    }
   }
 
   return (

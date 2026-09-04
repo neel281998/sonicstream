@@ -23,12 +23,19 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, username)
+  INSERT INTO public.profiles (id, username, is_artist)
   VALUES (
     NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'user_name', split_part(NEW.email, '@', 1))
+    COALESCE(
+      NEW.raw_user_meta_data->>'username',
+      NEW.raw_user_meta_data->>'user_name',
+      split_part(NEW.email, '@', 1)
+    ),
+    COALESCE((NEW.raw_user_meta_data->>'is_artist')::boolean, FALSE)
   )
-  ON CONFLICT (id) DO NOTHING;
+  ON CONFLICT (id) DO UPDATE
+    SET is_artist = EXCLUDED.is_artist,
+        username = COALESCE(public.profiles.username, EXCLUDED.username);
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
