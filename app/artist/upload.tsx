@@ -23,6 +23,7 @@ import { Spacing, Radii, FontSizes, FontWeights } from '@/constants/Theme';
 import { useAuthStore } from '@/store/authStore';
 import { uploadAndPublishTrack } from '@/services/artist';
 import { usePlayerStore } from '@/store/playerStore';
+import { showAlert, showCustomDialog } from '@/store/dialogStore';
 
 const AVAILABLE_GENRES = [
   'Pop',
@@ -122,15 +123,27 @@ export default function ArtistUploadScreen() {
 
   const handlePublish = async () => {
     if (!audioAsset) {
-      Alert.alert('Missing Audio', 'Please select an audio file to upload.');
+      showAlert({
+        title: 'Missing Audio',
+        message: 'Please select an audio file to upload.',
+        icon: 'musical-notes-outline',
+      });
       return;
     }
     if (!title.trim()) {
-      Alert.alert('Missing Title', 'Please enter a title for your track.');
+      showAlert({
+        title: 'Missing Title',
+        message: 'Please enter a title for your track.',
+        icon: 'text-outline',
+      });
       return;
     }
     if (!userId) {
-      Alert.alert('Error', 'You must be signed in to upload tracks.');
+      showAlert({
+        title: 'Sign In Required',
+        message: 'You must be signed in to upload tracks.',
+        icon: 'log-in-outline',
+      });
       return;
     }
 
@@ -154,12 +167,14 @@ export default function ArtistUploadScreen() {
 
       setUploadStatus('Published successfully!');
 
-      Alert.alert(
-        'Track Published! 🎉',
-        `"${publishedTrack.title}" is now live and available on SonicStream.`,
-        [
+      showCustomDialog({
+        title: 'Track Published! 🎉',
+        message: `"${publishedTrack.title}" is now live and ready to stream on SonicStream.`,
+        icon: 'checkmark-circle-outline',
+        buttons: [
           {
             text: 'Play Now',
+            style: 'default',
             onPress: async () => {
               await loadAndPlay(publishedTrack, [publishedTrack]);
               router.replace(`/player/${publishedTrack.id}`);
@@ -167,12 +182,17 @@ export default function ArtistUploadScreen() {
           },
           {
             text: 'Go to Library',
+            style: 'cancel',
             onPress: () => router.replace('/(tabs)/library'),
           },
-        ]
-      );
+        ],
+      });
     } catch (err: any) {
-      Alert.alert('Upload Failed', err?.message || 'An error occurred during upload.');
+      showAlert({
+        title: 'Upload Failed',
+        message: err?.message || 'An error occurred during upload.',
+        icon: 'alert-circle-outline',
+      });
     } finally {
       setIsUploading(false);
       setUploadStatus('');

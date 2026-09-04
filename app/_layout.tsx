@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { useLikesStore } from '@/store/likesStore';
 import { AuthGuard } from '@/components/layout/AuthGuard';
+import { CustomDialog } from '@/components/ui/CustomDialog';
 
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -86,6 +87,7 @@ export default function RootLayout() {
           <Stack.Screen name="artist/[id]" />
           <Stack.Screen name="onboarding" />
         </Stack>
+        <CustomDialog />
         </AuthGuard>
       </SafeAreaProvider>
     </GestureHandlerRootView>

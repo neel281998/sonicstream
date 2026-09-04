@@ -26,6 +26,7 @@ import {
 import { usePlayerStore } from '@/store/playerStore';
 import { useLikesStore } from '@/store/likesStore';
 import { useAuthStore } from '@/store/authStore';
+import { showConfirm, showAlert, showCustomDialog } from '@/store/dialogStore';
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -93,71 +94,78 @@ export default function PlaylistDetailScreen() {
 
   const confirmDeletePlaylist = () => {
     if (!playlist) return;
-    Alert.alert(
-      'Delete Playlist',
-      `Are you sure you want to delete "${playlist.title}"? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const ok = await deletePlaylist(playlist.id);
-            if (ok) {
-              router.back();
-            } else {
-              Alert.alert('Error', 'Could not delete playlist.');
-            }
-          },
-        },
-      ]
-    );
+    showConfirm({
+      title: 'Delete Playlist',
+      message: `Are you sure you want to delete "${playlist.title}"? This cannot be undone.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      destructive: true,
+      icon: 'trash-outline',
+      onConfirm: async () => {
+        const ok = await deletePlaylist(playlist.id);
+        if (ok) {
+          router.back();
+        } else {
+          showAlert({
+            title: 'Error',
+            message: 'Could not delete playlist.',
+            icon: 'alert-circle-outline',
+          });
+        }
+      },
+    });
   };
 
   const handleMenuPress = () => {
-    const options: AlertButton[] = [
-      {
-        text: 'Share Playlist',
-        onPress: () => {
-          handleShare();
+    showCustomDialog({
+      title,
+      icon: 'musical-notes',
+      buttons: [
+        {
+          text: 'Share Playlist',
+          onPress: handleShare,
         },
-      },
-    ];
-    if (isOwner) {
-      options.push({
-        text: 'Delete Playlist',
-        style: 'destructive',
-        onPress: confirmDeletePlaylist,
-      });
-    }
-    options.push({ text: 'Cancel', style: 'cancel' });
-
-    Alert.alert(title, undefined, options);
+        ...(isOwner
+          ? [
+              {
+                text: 'Delete Playlist',
+                style: 'destructive' as const,
+                onPress: confirmDeletePlaylist,
+              },
+            ]
+          : []),
+        {
+          text: 'Cancel',
+          style: 'cancel' as const,
+        },
+      ],
+    });
   };
 
   const handleRemoveTrack = (track: any) => {
     if (!playlist) return;
-    Alert.alert(
-      'Remove Song',
-      `Remove "${track.title}" from this playlist?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            const ok = await removeTrackFromPlaylist(playlist.id, track.id);
-            if (ok) {
-              setPlaylist((prev) =>
-                prev ? { ...prev, tracks: prev.tracks.filter((t) => t.id !== track.id) } : null
-              );
-            } else {
-              Alert.alert('Error', 'Could not remove track.');
-            }
-          },
-        },
-      ]
-    );
+    showConfirm({
+      title: 'Remove Song',
+      message: `Remove "${track.title}" from this playlist?`,
+      confirmText: 'Remove',
+      cancelText: 'Cancel',
+      destructive: true,
+      icon: 'remove-circle-outline',
+      onConfirm: async () => {
+        const ok = await removeTrackFromPlaylist(playlist.id, track.id);
+        if (ok) {
+          setPlaylist((prev) =>
+            prev ? { ...prev, tracks: prev.tracks.filter((t) => t.id !== track.id) } : null
+          );
+        } else {
+          showAlert({
+            title: 'Error',
+            message: 'Could not remove track.',
+            icon: 'alert-circle-outline',
+          });
+        }
+      },
+    });
   };
 
   async function handlePlayAll() {

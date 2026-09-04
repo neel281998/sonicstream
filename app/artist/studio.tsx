@@ -24,6 +24,7 @@ import {
   ArtistProfile,
 } from '@/services/artist';
 import { usePlayerStore, Track } from '@/store/playerStore';
+import { showConfirm, showAlert } from '@/store/dialogStore';
 
 function formatDurationSec(seconds: number) {
   const m = Math.floor(seconds / 60);
@@ -83,25 +84,26 @@ export default function ArtistStudioScreen() {
   };
 
   const handleDeleteTrack = (track: Track) => {
-    Alert.alert(
-      'Delete Track',
-      `Are you sure you want to delete "${track.title}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const ok = await deleteArtistTrack(track.id);
-            if (ok) {
-              setTracks((prev) => prev.filter((t) => t.id !== track.id));
-            } else {
-              Alert.alert('Error', 'Failed to delete track.');
-            }
-          },
-        },
-      ]
-    );
+    showConfirm({
+      title: 'Delete Track',
+      message: `Are you sure you want to delete "${track.title}"?`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      destructive: true,
+      icon: 'trash-outline',
+      onConfirm: async () => {
+        const ok = await deleteArtistTrack(track.id);
+        if (ok) {
+          setTracks((prev) => prev.filter((t) => t.id !== track.id));
+        } else {
+          showAlert({
+            title: 'Error',
+            message: 'Failed to delete track.',
+            icon: 'alert-circle-outline',
+          });
+        }
+      },
+    });
   };
 
   return (

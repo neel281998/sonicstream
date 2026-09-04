@@ -20,6 +20,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
 import { useRouter } from 'expo-router';
 import { activateArtistMode } from '@/services/artist';
+import { showConfirm, showAlert } from '@/store/dialogStore';
 
 const MENU_ITEMS = [
   { id: 'account', icon: 'person-circle-outline', label: 'Account Settings' },
@@ -39,54 +40,53 @@ export default function ProfileScreen() {
   const [activatingArtist, setActivatingArtist] = useState(false);
 
   const handleSignOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            setSigningOut(true);
-            try {
-              await signOut();
-              router.replace('/(auth)/sign-in');
-            } catch (err) {
-              console.warn('[profile] sign out error:', err);
-              router.replace('/(auth)/sign-in');
-            } finally {
-              setSigningOut(false);
-            }
-          },
-        },
-      ]
-    );
+    showConfirm({
+      title: 'Sign Out',
+      message: 'Are you sure you want to sign out of your account?',
+      confirmText: 'Sign Out',
+      cancelText: 'Cancel',
+      destructive: true,
+      icon: 'log-out-outline',
+      onConfirm: async () => {
+        setSigningOut(true);
+        try {
+          await signOut();
+          router.replace('/(auth)/sign-in');
+        } catch (err) {
+          console.warn('[profile] sign out error:', err);
+          router.replace('/(auth)/sign-in');
+        } finally {
+          setSigningOut(false);
+        }
+      },
+    });
   };
+
   const handleBecomeArtist = () => {
-    Alert.alert(
-      'Become an Artist 🎵',
-      'Would you like to activate Creator mode? You will be able to upload, publish, and distribute original music on SonicStream.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Activate Creator Mode',
-          onPress: async () => {
-            if (!user?.id) return;
-            try {
-              setActivatingArtist(true);
-              await activateArtistMode(user.id, profile?.username || 'Artist');
-              await fetchProfile(user.id);
-              router.push('/artist/studio');
-            } catch (e: any) {
-              Alert.alert('Error', e?.message || 'Could not activate artist mode.');
-            } finally {
-              setActivatingArtist(false);
-            }
-          },
-        },
-      ]
-    );
+    showConfirm({
+      title: 'Become an Artist',
+      message: 'Switch to Creator mode to upload, publish, and distribute original music to SonicStream listeners.',
+      confirmText: 'Activate Creator Mode',
+      cancelText: 'Not Now',
+      icon: 'musical-notes-outline',
+      onConfirm: async () => {
+        if (!user?.id) return;
+        try {
+          setActivatingArtist(true);
+          await activateArtistMode(user.id, profile?.username || 'Artist');
+          await fetchProfile(user.id);
+          router.push('/artist/studio');
+        } catch (e: any) {
+          showAlert({
+            title: 'Error',
+            message: e?.message || 'Could not activate artist mode.',
+            icon: 'alert-circle-outline',
+          });
+        } finally {
+          setActivatingArtist(false);
+        }
+      },
+    });
   };
 
   return (
