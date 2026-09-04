@@ -287,74 +287,78 @@ class SafeAudioPlayer {
 export const safeAudioPlayer = new SafeAudioPlayer();
 
 /**
- * Probes the duration of an audio file in seconds.
- * Tries expo-av first (safe, fast header probe without audio playback),
- * then expo-audio, safely cleaning up resources.
+ * Probes the duration of an audio file in seconds using expo-audio (Expo SDK 57 standard).
+ * Inspects file header/metadata without playing audio, and frees resources immediately.
  */
 export async function probeAudioDuration(uri: string): Promise<number | null> {
-  // 1. Try expo-av
   try {
-    const { Audio } = require('expo-av');
-    if (Audio?.Sound) {
-      const { sound, status } = await Audio.Sound.createAsync(
-        { uri },
-        { shouldPlay: false }
-      );
-      let durationSec: number | null = null;
-      if (
-        status &&
-        status.isLoaded &&
-        typeof status.durationMillis === 'number' &&
-        status.durationMillis > 0
-      ) {
-        durationSec = Math.round(status.durationMillis / 1000);
-      }
-      await sound.unloadAsync().catch(() => {});
-      if (durationSec && durationSec > 0) {
-        return durationSec;
-      }
-    }
-  } catch (err) {
-    console.warn('[probeAudioDuration] expo-av probe error:', err);
-  }
+    const { createAudioPlayer } = require('expo-audio');
+    if (createAudioPlayer) {
+      const player = createAudioPlayer({ uri });
+      // Ensure player remains silent while probing metadata
+      try {
+        player.volume = 0;
+        player.muted = true;
+      } catch {}
 
-  // 2. Try expo-audio
-  try {
-    const expoAudio = require('expo-audio');
-    if (expoAudio?.createAudioPlayer) {
-      const player = expoAudio.createAudioPlayer(uri);
       let durationSec: number | null = null;
       if (typeof player.duration === 'number' && player.duration > 0) {
         durationSec = Math.round(player.duration);
+      } else if (
+        player.currentStatus &&
+        typeof player.currentStatus.duration === 'number' &&
+        player.currentStatus.duration > 0
+      ) {
+        durationSec = Math.round(player.currentStatus.duration);
       } else {
         durationSec = await new Promise<number | null>((resolve) => {
           let resolved = false;
           let sub: any = null;
+
           const timer = setTimeout(() => {
             if (!resolved) {
               resolved = true;
-              if (sub && typeof sub.remove === 'function') sub.remove();
-              resolve(null);
+              if (sub && typeof sub.remove === 'function') {
+                sub.remove();
+              }
+              const fallback =
+                typeof player.duration === 'number' && player.duration > 0
+                  ? Math.round(player.duration)
+                  : player.currentStatus?.duration
+                  ? Math.round(player.currentStatus.duration)
+                  : null;
+              resolve(fallback);
             }
-          }, 1500);
+          }, 2000);
 
-          if (player.addListener) {
+          if (typeof player.addListener === 'function') {
             sub = player.addListener('playbackStatusUpdate', (status: any) => {
-              if (status?.duration && status.duration > 0 && !resolved) {
+              const dur =
+                status && typeof status.duration === 'number' && status.duration > 0
+                  ? status.duration
+                  : typeof player.duration === 'number' && player.duration > 0
+                  ? player.duration
+                  : null;
+
+              if (dur && !resolved) {
                 resolved = true;
                 clearTimeout(timer);
-                if (sub && typeof sub.remove === 'function') sub.remove();
-                resolve(Math.round(status.duration));
+                if (sub && typeof sub.remove === 'function') {
+                  sub.remove();
+                }
+                resolve(Math.round(dur));
               }
             });
           }
         });
       }
+
       try {
         if (typeof player.remove === 'function') {
           player.remove();
         }
       } catch {}
+
       if (durationSec && durationSec > 0) {
         return durationSec;
       }
