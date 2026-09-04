@@ -25,7 +25,7 @@ import { ThemedText } from '@/components/ui/ThemedText';
 import { Spacing, Radii, FontSizes, FontWeights } from '@/constants/Theme';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
-const ARTWORK_SIZE = SCREEN_W - Spacing.lg * 2;
+const ARTWORK_SIZE = Math.min(SCREEN_W - Spacing.lg * 2, SCREEN_H * 0.40);
 
 function formatTime(ms: number) {
   const safeMs = Math.max(0, isNaN(ms) ? 0 : ms);
@@ -166,203 +166,226 @@ export default function PlayerScreen() {
       colors={[colors.gradientStart, colors.gradientMid, colors.gradientEnd]}
       style={{ flex: 1 }}
     >
-    <SafeAreaView style={{ flex: 1 }}>
-      {/* Blurred backdrop artwork */}
+      {/* Blurred backdrop artwork covering entire screen */}
       {currentTrack.coverUrl && (
-        <View style={styles.backdropContainer}>
+        <View style={styles.backdropContainer} pointerEvents="none">
           <Image
             source={{ uri: currentTrack.coverUrl }}
-            style={[styles.backdropImage, { opacity: isDark ? 0.35 : 0.12 }]}
+            style={[styles.backdropImage, { opacity: isDark ? 0.35 : 0.15 }]}
             contentFit="cover"
-            blurRadius={60}
+            blurRadius={70}
           />
-          <View
-            style={[
-              styles.backdropOverlay,
-              {
-                backgroundColor: isDark
-                  ? 'rgba(12, 12, 16, 0.72)'
-                  : 'rgba(250, 247, 242, 0.88)',
-              },
-            ]}
+          <LinearGradient
+            colors={
+              isDark
+                ? [
+                    'rgba(15, 15, 18, 0.40)',
+                    'rgba(15, 15, 18, 0.70)',
+                    'rgba(15, 15, 18, 0.92)',
+                    colors.background,
+                  ]
+                : [
+                    'rgba(250, 247, 242, 0.35)',
+                    'rgba(250, 247, 242, 0.70)',
+                    'rgba(250, 247, 242, 0.92)',
+                    colors.background,
+                  ]
+            }
+            locations={[0, 0.35, 0.7, 1]}
+            style={styles.backdropOverlay}
           />
         </View>
       )}
 
-      {/* Top bar */}
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <Ionicons name="chevron-down" size={28} color={colors.primaryText} />
-        </TouchableOpacity>
-        <View style={{ alignItems: 'center' }}>
-          <Text
-            style={{
-              color: colors.secondaryText,
-              fontSize: 11,
-              fontWeight: '700',
-              fontFamily: 'DMSans_700Bold',
-              letterSpacing: 1.2,
-              opacity: 0.85,
-            }}
-          >
-            NOW PLAYING
-          </Text>
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+        {/* Top bar */}
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="chevron-down" size={28} color={colors.primaryText} />
+          </TouchableOpacity>
+          <View style={{ alignItems: 'center' }}>
+            <Text
+              style={{
+                color: colors.secondaryText,
+                fontSize: 11,
+                fontWeight: '700',
+                fontFamily: 'DMSans_700Bold',
+                letterSpacing: 1.2,
+                opacity: 0.85,
+              }}
+            >
+              NOW PLAYING
+            </Text>
+          </View>
+          <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} onPress={handleShare}>
+            <Ionicons name="ellipsis-horizontal" size={24} color={colors.primaryText} />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} onPress={handleShare}>
-          <Ionicons name="ellipsis-horizontal" size={24} color={colors.primaryText} />
-        </TouchableOpacity>
-      </View>
 
-      {/* Artwork */}
-      <View style={styles.artworkContainer}>
-        <Animated.View
-          style={[
-            styles.artworkWrapper,
-            { transform: [{ scale: artworkScale }], backgroundColor: colors.surfaceVariant },
-          ]}
-        >
-          {currentTrack.coverUrl ? (
-            <Image source={{ uri: currentTrack.coverUrl }} style={styles.artwork} contentFit="cover" transition={300} />
-          ) : (
-            <View style={[styles.artwork, { alignItems: 'center', justifyContent: 'center' }]}>
-              <Text style={{ fontSize: 80 }}>🎵</Text>
-            </View>
-          )}
-        </Animated.View>
-      </View>
-
-      {/* Track Info */}
-      <View style={styles.trackInfo}>
-        <View style={{ flex: 1 }}>
-          <ThemedText variant="titleLarge" fontWeight="black" numberOfLines={1}>
-            {currentTrack.title}
-          </ThemedText>
-          <ThemedText variant="bodyMedium" color={colors.secondaryText} numberOfLines={1}>
-            {currentTrack.artistName && currentTrack.artistName !== 'Unknown Artist'
-              ? currentTrack.artistName
-              : currentTrack.albumName || 'Featured Artist'}
-          </ThemedText>
-        </View>
-        <TouchableOpacity
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          onPress={handleToggleLike}
-          activeOpacity={0.7}
-        >
-          <Animated.View style={{ transform: [{ scale: heartScale }] }}>
-            <Ionicons
-              name={isLiked ? 'heart' : 'heart-outline'}
-              size={26}
-              color={isLiked ? '#E91E63' : colors.primary}
-            />
-          </Animated.View>
-        </TouchableOpacity>
-      </View>
-
-      {/* Progress Bar with smooth drag & tap */}
-      <View style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
-        <View
-          ref={trackContainerRef}
-          onLayout={updateTrackMeasurement}
-          {...panResponder.panHandlers}
-          style={styles.progressTouchableArea}
-        >
-          <View style={[styles.progressBg, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)' }]}>
-            <View
+        {/* Main layout container distributing space evenly */}
+        <View style={styles.mainContainer}>
+          {/* Artwork Container centers artwork in available top half space */}
+          <View style={styles.artworkContainer}>
+            <Animated.View
               style={[
-                styles.progressFill,
-                { backgroundColor: colors.primary, width: `${progress * 100}%` },
-              ]}
-            />
-            <View
-              style={[
-                styles.progressThumb,
+                styles.artworkWrapper,
                 {
-                  backgroundColor: isDark ? '#FFFFFF' : colors.primary,
-                  left: `${progress * 100}%`,
-                  transform: [{ scale: isScrubbing ? 1.3 : 1 }],
-                  elevation: 4,
+                  transform: [{ scale: artworkScale }],
+                  backgroundColor: colors.surfaceVariant,
                   shadowColor: '#000000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 3,
+                  shadowOffset: { width: 0, height: 10 },
+                  shadowOpacity: isDark ? 0.45 : 0.15,
+                  shadowRadius: 18,
+                  elevation: 8,
                 },
               ]}
-            />
+            >
+              {currentTrack.coverUrl ? (
+                <Image source={{ uri: currentTrack.coverUrl }} style={styles.artwork} contentFit="cover" transition={300} />
+              ) : (
+                <View style={[styles.artwork, { alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={{ fontSize: 80 }}>🎵</Text>
+                </View>
+              )}
+            </Animated.View>
+          </View>
+
+          {/* Bottom Section anchored at bottom with balanced layout */}
+          <View style={styles.bottomSection}>
+            {/* Track Info */}
+            <View style={styles.trackInfo}>
+              <View style={{ flex: 1 }}>
+                <ThemedText variant="titleLarge" fontWeight="black" numberOfLines={1}>
+                  {currentTrack.title}
+                </ThemedText>
+                <ThemedText variant="bodyMedium" color={colors.secondaryText} numberOfLines={1}>
+                  {currentTrack.artistName && currentTrack.artistName !== 'Unknown Artist'
+                    ? currentTrack.artistName
+                    : currentTrack.albumName || 'Featured Artist'}
+                </ThemedText>
+              </View>
+              <TouchableOpacity
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                onPress={handleToggleLike}
+                activeOpacity={0.7}
+              >
+                <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+                  <Ionicons
+                    name={isLiked ? 'heart' : 'heart-outline'}
+                    size={26}
+                    color={isLiked ? '#E91E63' : colors.primary}
+                  />
+                </Animated.View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Progress Bar with smooth drag & tap */}
+            <View style={styles.progressContainer}>
+              <View
+                ref={trackContainerRef}
+                onLayout={updateTrackMeasurement}
+                {...panResponder.panHandlers}
+                style={styles.progressTouchableArea}
+              >
+                <View style={[styles.progressBg, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)' }]}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      { backgroundColor: colors.primary, width: `${progress * 100}%` },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.progressThumb,
+                      {
+                        backgroundColor: isDark ? '#FFFFFF' : colors.primary,
+                        left: `${progress * 100}%`,
+                        transform: [{ scale: isScrubbing ? 1.3 : 1 }],
+                        elevation: 4,
+                        shadowColor: '#000000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 3,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+              <View style={styles.timeRow}>
+                <Text style={{ color: colors.secondaryText, fontSize: FontSizes.labelSmall, fontFamily: 'DMSans_500Medium', fontWeight: '600' }}>
+                  {formatTime(currentDisplayPos)}
+                </Text>
+                <Text style={{ color: colors.secondaryText, fontSize: FontSizes.labelSmall, fontFamily: 'DMSans_500Medium', fontWeight: '600' }}>
+                  {formatTime(durationMs)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Controls */}
+            <View style={styles.controls}>
+              <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Ionicons name="shuffle" size={22} color={colors.secondaryText} />
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={playPrevious} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Ionicons name="play-skip-back" size={32} color={colors.primaryText} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.playBtn,
+                  {
+                    backgroundColor: isDark ? '#FFFFFF' : '#18181A',
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: isDark ? 0.35 : 0.2,
+                    shadowRadius: 8,
+                    elevation: 6,
+                  },
+                ]}
+                onPress={togglePlayPause}
+                activeOpacity={0.85}
+              >
+                <Ionicons
+                  name={isPlaying ? 'pause' : 'play'}
+                  size={34}
+                  color={isDark ? '#000000' : '#FFFFFF'}
+                  style={!isPlaying ? { marginLeft: 3 } : undefined}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={playNext} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Ionicons name="play-skip-forward" size={32} color={colors.primaryText} />
+              </TouchableOpacity>
+
+              <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Ionicons name="repeat" size={22} color={colors.secondaryText} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Bottom Actions */}
+            <View style={[styles.bottomActions, { borderTopColor: colors.divider }]}>
+              <TouchableOpacity style={styles.actionBtn} onPress={() => setShowQueue(true)} activeOpacity={0.7}>
+                <Ionicons name="list" size={22} color={colors.primary} />
+                <Text style={{ color: colors.primary, fontSize: FontSizes.labelSmall, fontFamily: 'DMSans_500Medium', marginTop: 4 }}>Queue</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionBtn} onPress={handleShare} activeOpacity={0.7}>
+                <Ionicons name="share-outline" size={22} color={colors.secondaryText} />
+                <Text style={{ color: colors.secondaryText, fontSize: FontSizes.labelSmall, fontFamily: 'DMSans_400Regular', marginTop: 4 }}>Share</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={handleToggleLike}
+                activeOpacity={0.7}
+              >
+                <Ionicons name={isLiked ? 'heart' : 'add-circle-outline'} size={22} color={isLiked ? '#E91E63' : colors.secondaryText} />
+                <Text style={{ color: isLiked ? '#E91E63' : colors.secondaryText, fontSize: FontSizes.labelSmall, fontFamily: 'DMSans_400Regular', marginTop: 4 }}>
+                  {isLiked ? 'Liked' : 'Add'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-        <View style={styles.timeRow}>
-          <Text style={{ color: colors.secondaryText, fontSize: FontSizes.labelSmall, fontFamily: 'DMSans_500Medium', fontWeight: '600' }}>
-            {formatTime(currentDisplayPos)}
-          </Text>
-          <Text style={{ color: colors.secondaryText, fontSize: FontSizes.labelSmall, fontFamily: 'DMSans_500Medium', fontWeight: '600' }}>
-            {formatTime(durationMs)}
-          </Text>
-        </View>
-      </View>
-
-      {/* Controls */}
-      <View style={styles.controls}>
-        <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <Ionicons name="shuffle" size={22} color={colors.secondaryText} />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={playPrevious} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <Ionicons name="play-skip-back" size={32} color={colors.primaryText} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.playBtn,
-            {
-              backgroundColor: isDark ? '#FFFFFF' : '#18181A',
-              shadowColor: '#000000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: isDark ? 0.35 : 0.2,
-              shadowRadius: 8,
-              elevation: 6,
-            },
-          ]}
-          onPress={togglePlayPause}
-          activeOpacity={0.85}
-        >
-          <Ionicons
-            name={isPlaying ? 'pause' : 'play'}
-            size={34}
-            color={isDark ? '#000000' : '#FFFFFF'}
-            style={!isPlaying ? { marginLeft: 3 } : undefined}
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={playNext} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <Ionicons name="play-skip-forward" size={32} color={colors.primaryText} />
-        </TouchableOpacity>
-
-        <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <Ionicons name="repeat" size={22} color={colors.secondaryText} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Bottom Actions */}
-      <View style={[styles.bottomActions, { borderTopColor: colors.divider }]}>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => setShowQueue(true)} activeOpacity={0.7}>
-          <Ionicons name="list" size={22} color={colors.primary} />
-          <Text style={{ color: colors.primary, fontSize: FontSizes.labelSmall, fontFamily: 'DMSans_500Medium', marginTop: 2 }}>Queue</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} onPress={handleShare} activeOpacity={0.7}>
-          <Ionicons name="share-outline" size={22} color={colors.secondaryText} />
-          <Text style={{ color: colors.secondaryText, fontSize: FontSizes.labelSmall, fontFamily: 'DMSans_400Regular', marginTop: 2 }}>Share</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={handleToggleLike}
-          activeOpacity={0.7}
-        >
-          <Ionicons name={isLiked ? 'heart' : 'add-circle-outline'} size={22} color={isLiked ? '#E91E63' : colors.secondaryText} />
-          <Text style={{ color: isLiked ? '#E91E63' : colors.secondaryText, fontSize: FontSizes.labelSmall, fontFamily: 'DMSans_400Regular', marginTop: 2 }}>
-            {isLiked ? 'Liked' : 'Add'}
-          </Text>
-        </TouchableOpacity>
-      </View>
 
       {/* Queue Modal */}
       <Modal
@@ -531,26 +554,30 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   backdropImage: {
-    width: '100%',
-    height: '60%',
-    opacity: 0.4,
+    ...StyleSheet.absoluteFill,
+    transform: [{ scale: 1.15 }],
   },
   backdropOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(15, 15, 15, 0.5)',
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.md,
+    paddingTop: Spacing.xs,
+    paddingBottom: Spacing.xs,
+  },
+  mainContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
   },
   artworkContainer: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.lg,
+    paddingVertical: Spacing.xs,
   },
   artworkWrapper: {
     width: ARTWORK_SIZE,
@@ -562,12 +589,20 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  bottomSection: {
+    width: '100%',
+    paddingBottom: Spacing.xs,
+  },
   trackInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     marginBottom: Spacing.md,
     gap: Spacing.sm,
+  },
+  progressContainer: {
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   progressTouchableArea: {
     height: 36,
@@ -618,13 +653,18 @@ const styles = StyleSheet.create({
   bottomActions: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingTop: Spacing.sm,
+    alignItems: 'center',
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.xs,
     paddingHorizontal: Spacing.lg,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   actionBtn: {
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    minWidth: 60,
   },
   modalOverlay: {
     flex: 1,
