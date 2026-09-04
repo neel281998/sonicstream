@@ -8,8 +8,20 @@ import { MiniPlayer } from '@/components/music/MiniPlayer';
 import { usePlayerStore } from '@/store/playerStore';
 import { FontSizes, Spacing } from '@/constants/Theme';
 
-function TabBarIcon({ name, color }: { name: React.ComponentProps<typeof Ionicons>['name']; color: ColorValue }) {
-  return <Ionicons name={name} size={26} color={color as string} />;
+function TabBarIcon({
+  name,
+  color,
+  focused,
+}: {
+  name: React.ComponentProps<typeof Ionicons>['name'];
+  color: ColorValue;
+  focused: boolean;
+}) {
+  return (
+    <View style={styles.iconContainer}>
+      <Ionicons name={name} size={23} color={color as string} />
+    </View>
+  );
 }
 
 export default function TabLayout() {
@@ -17,8 +29,8 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const currentTrack = usePlayerStore((s) => s.currentTrack);
 
-  const bottomPadding = Math.max(insets.bottom, 8);
-  const tabBarHeight = 56 + bottomPadding;
+  const bottomPadding = Math.max(insets.bottom, 6);
+  const tabBarHeight = 58 + bottomPadding;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -28,18 +40,23 @@ export default function TabLayout() {
           tabBarStyle: {
             backgroundColor: colors.tabBar,
             borderTopColor: colors.tabBarBorder,
-            borderTopWidth: 0,
+            borderTopWidth: 1,
             height: tabBarHeight,
             paddingBottom: bottomPadding,
-            paddingTop: 8,
-            elevation: 0,
-            shadowOpacity: 0,
+            paddingTop: 6,
+            elevation: 8,
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: -3 },
+            shadowOpacity: 0.2,
+            shadowRadius: 6,
           },
           tabBarActiveTintColor: colors.tabBarActive as string,
           tabBarInactiveTintColor: colors.tabBarInactive as string,
           tabBarLabelStyle: {
-            fontSize: FontSizes.labelSmall,
+            fontSize: 11,
             fontFamily: 'DMSans_500Medium',
+            fontWeight: '600',
+            marginTop: 2,
           },
         }}
       >
@@ -48,7 +65,7 @@ export default function TabLayout() {
           options={{
             title: 'Home',
             tabBarIcon: ({ color, focused }) => (
-              <TabBarIcon name={focused ? 'home' : 'home-outline'} color={color} />
+              <TabBarIcon name={focused ? 'home' : 'home-outline'} color={color} focused={focused} />
             ),
           }}
         />
@@ -57,7 +74,7 @@ export default function TabLayout() {
           options={{
             title: 'Explore',
             tabBarIcon: ({ color, focused }) => (
-              <TabBarIcon name={focused ? 'compass' : 'compass-outline'} color={color} />
+              <TabBarIcon name={focused ? 'compass' : 'compass-outline'} color={color} focused={focused} />
             ),
           }}
         />
@@ -66,7 +83,7 @@ export default function TabLayout() {
           options={{
             title: 'Library',
             tabBarIcon: ({ color, focused }) => (
-              <TabBarIcon name={focused ? 'library' : 'library-outline'} color={color} />
+              <TabBarIcon name={focused ? 'library' : 'library-outline'} color={color} focused={focused} />
             ),
           }}
         />
@@ -75,7 +92,7 @@ export default function TabLayout() {
           options={{
             title: 'Profile',
             tabBarIcon: ({ color, focused }) => (
-              <TabBarIcon name={focused ? 'person' : 'person-outline'} color={color} />
+              <TabBarIcon name={focused ? 'person-circle' : 'person-circle-outline'} color={color} focused={focused} />
             ),
           }}
         />
@@ -101,5 +118,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
+  },
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
