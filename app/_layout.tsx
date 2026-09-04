@@ -37,10 +37,16 @@ export default function RootLayout() {
 
   // Listen to Supabase auth state changes
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      useLikesStore.getState().loadLikes(session?.user?.id);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        useLikesStore.getState().loadLikes(session?.user?.id);
+      })
+      .catch((e) => {
+        console.warn('[RootLayout] getSession error:', e);
+        setSession(null);
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {

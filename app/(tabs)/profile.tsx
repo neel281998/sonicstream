@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Switch,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -32,6 +33,33 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { profile, signOut } = useAuthStore();
   const { themeMode, setThemeMode } = useThemeStore();
+  const [signingOut, setSigningOut] = useState(false);
+
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            setSigningOut(true);
+            try {
+              await signOut();
+              router.replace('/(auth)/sign-in');
+            } catch (err) {
+              console.warn('[profile] sign out error:', err);
+              router.replace('/(auth)/sign-in');
+            } finally {
+              setSigningOut(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1, backgroundColor: colors.background }}>
@@ -162,7 +190,8 @@ export default function ProfileScreen() {
         <View style={{ paddingHorizontal: Spacing.lg, marginTop: Spacing.md }}>
           <Button
             label="Sign Out"
-            onPress={signOut}
+            onPress={handleSignOut}
+            loading={signingOut}
             variant="outlined"
             fullWidth
           />
