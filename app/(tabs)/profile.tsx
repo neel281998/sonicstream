@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Switch,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -18,6 +19,7 @@ import { Spacing, Radii } from '@/constants/Theme';
 import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
 import { useRouter } from 'expo-router';
+import { activateArtistMode } from '@/services/artist';
 
 const MENU_ITEMS = [
   { id: 'account', icon: 'person-circle-outline', label: 'Account Settings' },
@@ -31,9 +33,10 @@ const MENU_ITEMS = [
 export default function ProfileScreen() {
   const colors = useThemeColors();
   const router = useRouter();
-  const { profile, signOut } = useAuthStore();
+  const { profile, signOut, user, fetchProfile } = useAuthStore();
   const { themeMode, setThemeMode } = useThemeStore();
   const [signingOut, setSigningOut] = useState(false);
+  const [activatingArtist, setActivatingArtist] = useState(false);
 
   const handleSignOut = () => {
     Alert.alert(
@@ -54,6 +57,31 @@ export default function ProfileScreen() {
               router.replace('/(auth)/sign-in');
             } finally {
               setSigningOut(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+  const handleBecomeArtist = () => {
+    Alert.alert(
+      'Become an Artist 🎵',
+      'Would you like to activate Creator mode? You will be able to upload, publish, and distribute original music on SonicStream.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Activate Creator Mode',
+          onPress: async () => {
+            if (!user?.id) return;
+            try {
+              setActivatingArtist(true);
+              await activateArtistMode(user.id, profile?.username || 'Artist');
+              await fetchProfile(user.id);
+              router.push('/artist/studio');
+            } catch (e: any) {
+              Alert.alert('Error', e?.message || 'Could not activate artist mode.');
+            } finally {
+              setActivatingArtist(false);
             }
           },
         },
@@ -97,6 +125,54 @@ export default function ProfileScreen() {
               <ThemedText variant="bodySmall" color={colors.secondaryText}>{stat.label}</ThemedText>
             </View>
           ))}
+        </View>
+
+        {/* Creator / Artist Studio Banner */}
+        <View style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
+          {profile?.is_artist ? (
+            <TouchableOpacity
+              style={[styles.artistBanner, { backgroundColor: colors.primaryContainer, borderColor: colors.primary }]}
+              onPress={() => router.push('/artist/studio')}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.artistBannerIcon, { backgroundColor: colors.card }]}>
+                <Ionicons name="musical-notes" size={24} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                <ThemedText variant="titleSmall" fontWeight="extrabold" color={colors.primary}>
+                  Artist Studio
+                </ThemedText>
+                <ThemedText variant="bodySmall" color={colors.secondaryText}>
+                  Upload music & manage your published tracks
+                </ThemedText>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.primary} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.artistBanner, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+              onPress={handleBecomeArtist}
+              disabled={activatingArtist}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.artistBannerIcon, { backgroundColor: colors.surfaceVariant }]}>
+                <Ionicons name="mic-outline" size={24} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                <ThemedText variant="titleSmall" fontWeight="bold">
+                  Become an Artist
+                </ThemedText>
+                <ThemedText variant="bodySmall" color={colors.secondaryText}>
+                  Publish your songs and share with listeners
+                </ThemedText>
+              </View>
+              {activatingArtist ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons name="chevron-forward" size={18} color={colors.hint} />
+              )}
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Appearance / Theme Selector */}
@@ -284,5 +360,20 @@ const styles = StyleSheet.create({
   },
   segmentText: {
     fontSize: 13,
+  },
+  artistBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: Radii.md,
+    borderWidth: 1,
+    gap: Spacing.xs,
+  },
+  artistBannerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: Radii.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

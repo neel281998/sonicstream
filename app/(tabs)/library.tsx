@@ -179,14 +179,15 @@ export default function LibraryScreen() {
           <View style={{ paddingHorizontal: Spacing.lg, marginTop: Spacing.lg }}>
             <TouchableOpacity
               style={[styles.uploadCard, { backgroundColor: colors.primaryContainer, borderColor: colors.primary }]}
+              onPress={() => router.push('/artist/studio')}
               activeOpacity={0.85}
             >
               <Ionicons name="cloud-upload-outline" size={28} color={colors.primary} />
               <ThemedText variant="titleSmall" fontWeight="bold" color={colors.primary} style={{ marginTop: 6 }}>
-                Upload a Track
+                Artist Studio & Upload
               </ThemedText>
               <ThemedText variant="bodySmall" color={colors.secondaryText} style={{ marginTop: 2, textAlign: 'center' }}>
-                Share your music with the world
+                Upload new music and manage your tracks
               </ThemedText>
             </TouchableOpacity>
           </View>

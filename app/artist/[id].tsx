@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
   Text,
-  Image,
+  ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,8 +16,9 @@ import { ThemedText } from '@/components/ui/ThemedText';
 import { TrackItem } from '@/components/music/TrackItem';
 import { usePlayerStore, Track } from '@/store/playerStore';
 import { Spacing, Radii, FontSizes, FontWeights } from '@/constants/Theme';
+import { getArtistById, getArtistTracks, ArtistProfile } from '@/services/artist';
 
-// Mock data — replace with Supabase query by artist id
+// Mock data fallback
 const MOCK_ARTIST = {
   id: '1',
   name: 'The Weeknd',
@@ -44,12 +46,40 @@ const MOCK_ALBUMS = [
 export default function ArtistProfileScreen() {
   const colors = useThemeColors();
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const { loadAndPlay } = usePlayerStore();
   const [isFollowing, setIsFollowing] = useState(false);
 
+  const [dbArtist, setDbArtist] = useState<ArtistProfile | null>(null);
+  const [tracks, setTracks] = useState<Track[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!id || id === '1') {
+      setLoading(false);
+      return;
+    }
+
+    Promise.all([
+      getArtistById(id),
+      getArtistTracks(id),
+    ])
+      .then(([artistData, trackData]) => {
+        if (artistData) setDbArtist(artistData);
+        if (trackData.length > 0) setTracks(trackData);
+      })
+      .catch((e) => console.warn('Artist load error:', e))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  const artistName = dbArtist?.name || MOCK_ARTIST.name;
+  const artistBio = dbArtist?.bio || MOCK_ARTIST.bio;
+  const avatarUrl = dbArtist?.avatarUrl || MOCK_ARTIST.avatarUrl;
+  const isVerified = dbArtist?.verified ?? MOCK_ARTIST.verified;
+  const activeTracks = tracks.length > 0 ? tracks : MOCK_POPULAR_TRACKS;
+
   async function handleTrackPress(track: Track) {
-    await loadAndPlay(track, MOCK_POPULAR_TRACKS);
+    await loadAndPlay(track, activeTracks);
     router.push(`/player/${track.id}`);
   }
 
@@ -70,8 +100,8 @@ export default function ArtistProfileScreen() {
 
           {/* Artist Avatar */}
           <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-            {MOCK_ARTIST.avatarUrl ? (
-              <Image source={{ uri: MOCK_ARTIST.avatarUrl }} style={StyleSheet.absoluteFill} />
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={StyleSheet.absoluteFill} />
             ) : (
               <Text style={{ fontSize: 56 }}>🎤</Text>
             )}
@@ -82,27 +112,27 @@ export default function ArtistProfileScreen() {
         <View style={{ paddingHorizontal: Spacing.lg, marginTop: Spacing.md }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
             <ThemedText variant="headlineMedium" fontWeight="black">
-              {MOCK_ARTIST.name}
+              {artistName}
             </ThemedText>
-            {MOCK_ARTIST.verified && (
+            {isVerified && (
               <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
             )}
           </View>
 
           <ThemedText variant="bodySmall" color={colors.secondaryText} style={{ marginTop: 4 }}>
-            {MOCK_ARTIST.monthlyListeners} monthly listeners
+            {dbArtist ? `${activeTracks.length} tracks published` : `${MOCK_ARTIST.monthlyListeners} monthly listeners`}
           </ThemedText>
 
           {/* Stats */}
           <View style={[styles.statsRow, { borderColor: colors.divider }]}>
             <View style={styles.statItem}>
-              <ThemedText variant="titleMedium" fontWeight="black">{MOCK_ARTIST.followers}</ThemedText>
-              <ThemedText variant="bodySmall" color={colors.secondaryText}>Followers</ThemedText>
+              <ThemedText variant="titleMedium" fontWeight="black">{dbArtist ? `${activeTracks.length}` : MOCK_ARTIST.followers}</ThemedText>
+              <ThemedText variant="bodySmall" color={colors.secondaryText}>{dbArtist ? 'Tracks' : 'Followers'}</ThemedText>
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.divider }]} />
             <View style={styles.statItem}>
-              <ThemedText variant="titleMedium" fontWeight="black">{MOCK_ARTIST.monthlyListeners}</ThemedText>
-              <ThemedText variant="bodySmall" color={colors.secondaryText}>Monthly Listeners</ThemedText>
+              <ThemedText variant="titleMedium" fontWeight="black">{dbArtist ? 'Verified' : MOCK_ARTIST.monthlyListeners}</ThemedText>
+              <ThemedText variant="bodySmall" color={colors.secondaryText}>{dbArtist ? 'Status' : 'Monthly Listeners'}</ThemedText>
             </View>
           </View>
 
@@ -113,8 +143,6 @@ export default function ArtistProfileScreen() {
                 styles.followBtn,
                 {
                   backgroundColor: isFollowing ? colors.primaryContainer : colors.primary,
-                  borderColor: colors.primary,
-                  borderWidth: isFollowing ? 1.5 : 0,
                 },
               ]}
               onPress={() => setIsFollowing(!isFollowing)}
@@ -134,7 +162,7 @@ export default function ArtistProfileScreen() {
 
             <TouchableOpacity
               style={[styles.iconActionBtn, { backgroundColor: colors.surfaceVariant }]}
-              onPress={() => handleTrackPress(MOCK_POPULAR_TRACKS[0])}
+              onPress={() => activeTracks.length > 0 && handleTrackPress(activeTracks[0])}
             >
               <Ionicons name="shuffle" size={20} color={colors.primaryText} />
             </TouchableOpacity>
@@ -145,27 +173,29 @@ export default function ArtistProfileScreen() {
           </View>
 
           {/* Bio */}
-          <View style={[styles.bioCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-            <ThemedText variant="bodySmall" color={colors.secondaryText} style={{ lineHeight: 20 }}>
-              {MOCK_ARTIST.bio}
-            </ThemedText>
-          </View>
+          {artistBio ? (
+            <View style={[styles.bioCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+              <ThemedText variant="bodySmall" color={colors.secondaryText} style={{ lineHeight: 20 }}>
+                {artistBio}
+              </ThemedText>
+            </View>
+          ) : null}
         </View>
 
         {/* Popular Tracks */}
         <View style={{ marginTop: Spacing.lg }}>
           <View style={styles.sectionHeader}>
-            <ThemedText variant="titleMedium" fontWeight="bold">Popular</ThemedText>
+            <ThemedText variant="titleMedium" fontWeight="bold">Tracks</ThemedText>
             <TouchableOpacity>
               <Text style={{ color: colors.primary, fontSize: FontSizes.labelLarge, fontFamily: 'DMSans_500Medium' }}>
-                See all
+                {activeTracks.length} songs
               </Text>
             </TouchableOpacity>
           </View>
 
-          {MOCK_POPULAR_TRACKS.map((track, index) => (
+          {activeTracks.map((track, index) => (
             <TouchableOpacity
-              key={track.id}
+              key={`${track.id}-${index}`}
               style={[styles.trackRow, { borderBottomColor: colors.divider }]}
               onPress={() => handleTrackPress(track)}
               activeOpacity={0.7}

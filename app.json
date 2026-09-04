@@ -55,7 +55,14 @@
       "expo-image",
       "expo-font",
       "expo-status-bar",
-      "expo-asset"
+      "expo-asset",
+      "expo-document-picker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow SonicStream to access your photos to select cover art."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
