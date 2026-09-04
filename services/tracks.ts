@@ -57,14 +57,55 @@ export async function ensureJamendoTrackInDb(track: Track): Promise<string | nul
     return track.id.startsWith('jamendo-') ? null : track.id;
   }
 
+  // 1. Resolve or create artist in Supabase
+  let artistId: string | null = null;
+  if (track.artistName && track.artistName !== 'Unknown Artist') {
+    try {
+      const { data: existingArtist } = await supabase
+        .from('artists')
+        .select('id')
+        .eq('name', track.artistName)
+        .maybeSingle();
+
+      if (existingArtist?.id) {
+        artistId = existingArtist.id;
+      } else {
+        const { data: newArtist } = await supabase
+          .from('artists')
+          .insert({ name: track.artistName })
+          .select('id')
+          .maybeSingle();
+        if (newArtist?.id) {
+          artistId = newArtist.id;
+        }
+      }
+    } catch {
+      // Ignore if artist insert is restricted by RLS
+    }
+  }
+
+  // 2. Check if track already exists
   const { data: existing } = await supabase
     .from('tracks')
-    .select('id')
+    .select('id, artist_id')
     .eq('jamendo_id', track.jamendoId)
     .maybeSingle();
 
-  if (existing) return existing.id;
+  if (existing) {
+    if (artistId && !existing.artist_id) {
+      try {
+        await supabase
+          .from('tracks')
+          .update({ artist_id: artistId })
+          .eq('id', existing.id);
+      } catch {
+        // Ignore if update fails
+      }
+    }
+    return existing.id;
+  }
 
+  // 3. Insert track with artist_id linked
   const { data, error } = await supabase
     .from('tracks')
     .insert({
@@ -74,6 +115,7 @@ export async function ensureJamendoTrackInDb(track: Track): Promise<string | nul
       audio_url: track.audioUrl,
       jamendo_id: track.jamendoId,
       cover_url: track.coverUrl,
+      ...(artistId ? { artist_id: artistId } : {}),
     })
     .select('id')
     .single();

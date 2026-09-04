@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   ScrollView,
@@ -26,9 +26,12 @@ function formatDuration(seconds: number): string {
 }
 
 function totalDuration(tracks: { duration: number }[]): string {
-  const totalSec = tracks.reduce((sum, t) => sum + t.duration, 0);
-  const min = Math.floor(totalSec / 60);
-  return `${min} min`;
+  const totalSeconds = tracks.reduce((acc, t) => acc + t.duration, 0);
+  const m = Math.floor(totalSeconds / 60);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  const remM = m % 60;
+  return `${h} hr ${remM} min`;
 }
 
 export default function PlaylistDetailScreen() {
@@ -55,7 +58,16 @@ export default function PlaylistDetailScreen() {
       .finally(() => setLoading(false));
   }, [id, isLikedPlaylist]);
 
-  const activeTracks = isLikedPlaylist ? likedTracks : (playlist?.tracks ?? []);
+  const rawTracks = isLikedPlaylist ? likedTracks : (playlist?.tracks ?? []);
+  const activeTracks = useMemo(() => {
+    const seen = new Set<string>();
+    return rawTracks.filter((t: any) => {
+      const key = t.jamendoId ? `jamendo-${t.jamendoId}` : t.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [rawTracks]);
   const title = isLikedPlaylist ? 'Liked Songs' : (playlist?.title ?? 'Playlist');
   const description = isLikedPlaylist ? 'Songs you saved to your favorites' : playlist?.description;
 
