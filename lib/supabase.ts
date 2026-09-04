@@ -3,16 +3,51 @@ import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Replace these with your Supabase project URL and anon key
-// Get them from: https://app.supabase.com -> Settings -> API
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? 'https://your-project.supabase.co';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? 'your-anon-key';
+// Validate Supabase project URL and anon key
+const rawUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const SUPABASE_URL = (rawUrl && rawUrl.startsWith('http'))
+  ? rawUrl
+  : 'https://placeholder.supabase.co';
 
-// SecureStore adapter for auth tokens (more secure than AsyncStorage)
+const rawKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const SUPABASE_ANON_KEY = (rawKey && rawKey.trim().length > 0)
+  ? rawKey
+  : 'placeholder-anon-key';
+
+// Crash-proof SecureStore adapter with AsyncStorage fallback
 const ExpoSecureStoreAdapter = {
-  getItem: (key: string) => SecureStore.getItemAsync(key),
-  setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
-  removeItem: (key: string) => SecureStore.deleteItemAsync(key),
+  getItem: async (key: string) => {
+    try {
+      return await SecureStore.getItemAsync(key);
+    } catch (e) {
+      console.warn('[SecureStore] getItem error, trying AsyncStorage fallback:', e);
+      try {
+        return await AsyncStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    }
+  },
+  setItem: async (key: string, value: string) => {
+    try {
+      await SecureStore.setItemAsync(key, value);
+    } catch (e) {
+      console.warn('[SecureStore] setItem failed (e.g. 2KB limit), falling back to AsyncStorage:', e);
+      try {
+        await AsyncStorage.setItem(key, value);
+      } catch {}
+    }
+  },
+  removeItem: async (key: string) => {
+    try {
+      await SecureStore.deleteItemAsync(key);
+    } catch (e) {
+      console.warn('[SecureStore] deleteItem error:', e);
+    }
+    try {
+      await AsyncStorage.removeItem(key);
+    } catch {}
+  },
 };
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
