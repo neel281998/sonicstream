@@ -122,11 +122,73 @@ export async function ensureArtistForUser(
 }
 
 /**
- * Convert local file URI into a Blob for Supabase upload
+ * Deduce a valid audio MIME type matching Supabase storage allowed_mime_types
  */
-async function uriToBlob(uri: string): Promise<Blob> {
+export function resolveAudioMimeType(fileName: string, mimeType?: string): string {
+  const ext = (fileName.split('.').pop() || '').toLowerCase();
+
+  if (ext === 'mp3') return 'audio/mpeg';
+  if (ext === 'm4a') return 'audio/x-m4a';
+  if (ext === 'mp4') return 'audio/mp4';
+  if (ext === 'wav') return 'audio/wav';
+  if (ext === 'ogg' || ext === 'oga') return 'audio/ogg';
+  if (ext === 'aac') return 'audio/aac';
+  if (ext === 'flac') return 'audio/flac';
+
+  if (mimeType && mimeType.startsWith('audio/') && mimeType !== 'audio/*') {
+    if (mimeType === 'audio/mp3') return 'audio/mpeg';
+    return mimeType;
+  }
+
+  return 'audio/mpeg';
+}
+
+/**
+ * Deduce a valid image MIME type matching Supabase covers bucket
+ */
+export function resolveImageMimeType(uri: string, mimeType?: string): string {
+  if (mimeType && mimeType.startsWith('image/')) return mimeType;
+  const ext = (uri.split('.').pop() || '').toLowerCase();
+  if (ext === 'png') return 'image/png';
+  if (ext === 'webp') return 'image/webp';
+  if (ext === 'avif') return 'image/avif';
+  return 'image/jpeg';
+}
+
+/**
+ * Convert local file URI into a typed Blob with the explicit MIME type.
+ * Fixes React Native fetch().blob() assigning 'text/plain' as default MIME type.
+ */
+async function uriToTypedBlob(uri: string, mimeType: string, fileName?: string): Promise<Blob> {
   const response = await fetch(uri);
-  const blob = await response.blob();
+  const rawBlob = await response.blob();
+
+  let blob: Blob;
+  if (typeof (rawBlob as any).slice === 'function') {
+    blob = (rawBlob as any).slice(0, rawBlob.size, mimeType);
+  } else {
+    blob = rawBlob;
+  }
+
+  // Explicitly define type & name for React Native's FormData parser
+  try {
+    Object.defineProperty(blob, 'type', {
+      value: mimeType,
+      writable: true,
+      configurable: true,
+    });
+  } catch {}
+
+  if (fileName) {
+    try {
+      Object.defineProperty(blob, 'name', {
+        value: fileName,
+        writable: true,
+        configurable: true,
+      });
+    } catch {}
+  }
+
   return blob;
 }
 
@@ -137,18 +199,19 @@ export async function uploadAudioToStorage(
   userId: string,
   uri: string,
   fileName: string,
-  mimeType = 'audio/mpeg'
+  rawMimeType?: string
 ): Promise<string> {
-  const ext = fileName.split('.').pop() || 'mp3';
+  const ext = (fileName.split('.').pop() || 'mp3').toLowerCase();
   const cleanBaseName = fileName.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30);
   const storagePath = `${userId}/${Date.now()}_${cleanBaseName}.${ext}`;
 
-  const blob = await uriToBlob(uri);
+  const resolvedMime = resolveAudioMimeType(fileName, rawMimeType);
+  const blob = await uriToTypedBlob(uri, resolvedMime, fileName);
 
   const { error: uploadErr } = await supabase.storage
     .from('tracks')
     .upload(storagePath, blob, {
-      contentType: mimeType,
+      contentType: resolvedMime,
       upsert: true,
     });
 
@@ -179,15 +242,17 @@ export async function uploadAudioToStorage(
 export async function uploadCoverToStorage(
   userId: string,
   uri: string,
-  mimeType = 'image/jpeg'
+  rawMimeType = 'image/jpeg'
 ): Promise<string> {
-  const storagePath = `${userId}/${Date.now()}_cover.jpg`;
-  const blob = await uriToBlob(uri);
+  const resolvedMime = resolveImageMimeType(uri, rawMimeType);
+  const ext = resolvedMime.includes('png') ? 'png' : resolvedMime.includes('webp') ? 'webp' : 'jpg';
+  const storagePath = `${userId}/${Date.now()}_cover.${ext}`;
+  const blob = await uriToTypedBlob(uri, resolvedMime, `cover.${ext}`);
 
   const { error: uploadErr } = await supabase.storage
     .from('covers')
     .upload(storagePath, blob, {
-      contentType: mimeType,
+      contentType: resolvedMime,
       upsert: true,
     });
 
