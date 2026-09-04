@@ -17,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useThemeColors } from '@/hooks/useThemeColors';
+import { useThemeColors, useActiveColorScheme } from '@/hooks/useThemeColors';
 import { usePlayerStore, Track } from '@/store/playerStore';
 import { useLikesStore } from '@/store/likesStore';
 import { useAuthStore } from '@/store/authStore';
@@ -43,6 +43,8 @@ function formatDurationSec(seconds: number) {
 
 export default function PlayerScreen() {
   const colors = useThemeColors();
+  const colorScheme = useActiveColorScheme();
+  const isDark = colorScheme === 'dark';
   const router = useRouter();
   const userId = useAuthStore((s) => s.user?.id);
 
@@ -170,11 +172,20 @@ export default function PlayerScreen() {
         <View style={styles.backdropContainer}>
           <Image
             source={{ uri: currentTrack.coverUrl }}
-            style={styles.backdropImage}
+            style={[styles.backdropImage, { opacity: isDark ? 0.35 : 0.12 }]}
             contentFit="cover"
             blurRadius={60}
           />
-          <View style={styles.backdropOverlay} />
+          <View
+            style={[
+              styles.backdropOverlay,
+              {
+                backgroundColor: isDark
+                  ? 'rgba(12, 12, 16, 0.72)'
+                  : 'rgba(250, 247, 242, 0.88)',
+              },
+            ]}
+          />
         </View>
       )}
 
@@ -184,7 +195,16 @@ export default function PlayerScreen() {
           <Ionicons name="chevron-down" size={28} color={colors.primaryText} />
         </TouchableOpacity>
         <View style={{ alignItems: 'center' }}>
-          <Text style={{ color: colors.secondaryText, fontSize: FontSizes.labelSmall, fontFamily: 'DMSans_400Regular' }}>
+          <Text
+            style={{
+              color: colors.secondaryText,
+              fontSize: 11,
+              fontWeight: '700',
+              fontFamily: 'DMSans_700Bold',
+              letterSpacing: 1.2,
+              opacity: 0.85,
+            }}
+          >
             NOW PLAYING
           </Text>
         </View>
@@ -218,7 +238,9 @@ export default function PlayerScreen() {
             {currentTrack.title}
           </ThemedText>
           <ThemedText variant="bodyMedium" color={colors.secondaryText} numberOfLines={1}>
-            {currentTrack.artistName}
+            {currentTrack.artistName && currentTrack.artistName !== 'Unknown Artist'
+              ? currentTrack.artistName
+              : currentTrack.albumName || 'Featured Artist'}
           </ThemedText>
         </View>
         <TouchableOpacity
@@ -244,7 +266,7 @@ export default function PlayerScreen() {
           {...panResponder.panHandlers}
           style={styles.progressTouchableArea}
         >
-          <View style={[styles.progressBg, { backgroundColor: colors.surfaceVariant }]}>
+          <View style={[styles.progressBg, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)' }]}>
             <View
               style={[
                 styles.progressFill,
@@ -255,19 +277,24 @@ export default function PlayerScreen() {
               style={[
                 styles.progressThumb,
                 {
-                  backgroundColor: colors.primary,
+                  backgroundColor: isDark ? '#FFFFFF' : colors.primary,
                   left: `${progress * 100}%`,
                   transform: [{ scale: isScrubbing ? 1.3 : 1 }],
+                  elevation: 4,
+                  shadowColor: '#000000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 3,
                 },
               ]}
             />
           </View>
         </View>
         <View style={styles.timeRow}>
-          <Text style={{ color: colors.secondaryText, fontSize: FontSizes.labelSmall, fontFamily: 'DMSans_400Regular' }}>
+          <Text style={{ color: colors.secondaryText, fontSize: FontSizes.labelSmall, fontFamily: 'DMSans_500Medium', fontWeight: '600' }}>
             {formatTime(currentDisplayPos)}
           </Text>
-          <Text style={{ color: colors.secondaryText, fontSize: FontSizes.labelSmall, fontFamily: 'DMSans_400Regular' }}>
+          <Text style={{ color: colors.secondaryText, fontSize: FontSizes.labelSmall, fontFamily: 'DMSans_500Medium', fontWeight: '600' }}>
             {formatTime(durationMs)}
           </Text>
         </View>
@@ -284,14 +311,24 @@ export default function PlayerScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.playBtn, { backgroundColor: colors.primary }]}
+          style={[
+            styles.playBtn,
+            {
+              backgroundColor: isDark ? '#FFFFFF' : '#18181A',
+              shadowColor: '#000000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: isDark ? 0.35 : 0.2,
+              shadowRadius: 8,
+              elevation: 6,
+            },
+          ]}
           onPress={togglePlayPause}
           activeOpacity={0.85}
         >
           <Ionicons
             name={isPlaying ? 'pause' : 'play'}
-            size={32}
-            color={colors.onPrimary}
+            size={34}
+            color={isDark ? '#000000' : '#FFFFFF'}
             style={!isPlaying ? { marginLeft: 3 } : undefined}
           />
         </TouchableOpacity>
