@@ -219,8 +219,8 @@ CREATE POLICY "Albums: artist can create"
   );
 
 -- TRACKS
-CREATE POLICY "Tracks: authenticated read"
-  ON public.tracks FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Tracks: public read"
+  ON public.tracks FOR SELECT USING (true);
 CREATE POLICY "Tracks: artist can upload"
   ON public.tracks FOR INSERT WITH CHECK (
     source = 'upload' AND
