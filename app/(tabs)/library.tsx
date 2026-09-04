@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GradientBackground } from '@/components/ui/GradientBackground';
@@ -14,9 +15,10 @@ import { ThemedText } from '@/components/ui/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing, Radii, FontSizes } from '@/constants/Theme';
 import { useAuthStore } from '@/store/authStore';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { getLibraryCounts, getUserPlaylists, PlaylistSummary } from '@/services/playlists';
 import { useLikesStore } from '@/store/likesStore';
+import { CreatePlaylistModal } from '@/components/music/CreatePlaylistModal';
 
 export default function LibraryScreen() {
   const colors = useThemeColors();
@@ -27,9 +29,14 @@ export default function LibraryScreen() {
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [counts, setCounts] = useState({ playlists: 0, liked: 0 });
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const fetchLibrary = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
     try {
       const [userPlaylists, libraryCounts] = await Promise.all([
         getUserPlaylists(userId),
@@ -41,10 +48,22 @@ export default function LibraryScreen() {
       console.warn('Library fetch error:', e);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [userId]);
 
   useEffect(() => {
+    fetchLibrary();
+  }, [fetchLibrary]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchLibrary();
+    }, [fetchLibrary])
+  );
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
     fetchLibrary();
   }, [fetchLibrary]);
 
@@ -64,15 +83,29 @@ export default function LibraryScreen() {
     }
   };
 
+  const handlePlaylistCreated = (newPlaylist: PlaylistSummary) => {
+    setPlaylists((prev) => [newPlaylist, ...prev]);
+    setCounts((prev) => ({ ...prev, playlists: prev.playlists + 1 }));
+    router.push(`/playlist/${newPlaylist.id}`);
+  };
+
   return (
     <GradientBackground>
     <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 140 }}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 140 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
+      >
         {/* Header */}
         <View style={[styles.header]}>
           <ThemedText variant="headlineMedium" fontWeight="extrabold">Your Library</ThemedText>
           <TouchableOpacity
             style={[styles.addBtn, { backgroundColor: colors.primaryContainer }]}
+            onPress={() => setShowCreateModal(true)}
+            activeOpacity={0.7}
+            accessibilityLabel="Create new playlist"
           >
             <Ionicons name="add" size={22} color={colors.primary} />
           </TouchableOpacity>
@@ -160,6 +193,12 @@ export default function LibraryScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
+
+    <CreatePlaylistModal
+      visible={showCreateModal}
+      onClose={() => setShowCreateModal(false)}
+      onCreated={handlePlaylistCreated}
+    />
     </GradientBackground>
   );
 }

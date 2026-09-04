@@ -7,6 +7,9 @@ import {
   Text,
   ActivityIndicator,
   Image,
+  Alert,
+  AlertButton,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -14,7 +17,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { ThemedText } from '@/components/ui/ThemedText';
 import { Spacing, Radii, FontSizes } from '@/constants/Theme';
-import { getPlaylistWithTracks, PlaylistDetail } from '@/services/playlists';
+import {
+  getPlaylistWithTracks,
+  deletePlaylist,
+  removeTrackFromPlaylist,
+  PlaylistDetail,
+} from '@/services/playlists';
 import { usePlayerStore } from '@/store/playerStore';
 import { useLikesStore } from '@/store/likesStore';
 import { useAuthStore } from '@/store/authStore';
@@ -71,6 +79,87 @@ export default function PlaylistDetailScreen() {
   const title = isLikedPlaylist ? 'Liked Songs' : (playlist?.title ?? 'Playlist');
   const description = isLikedPlaylist ? 'Songs you saved to your favorites' : playlist?.description;
 
+  const isOwner = !isLikedPlaylist && !!playlist && !!userId && playlist.ownerId === userId;
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Listen to "${title}" on SonicStream!`,
+      });
+    } catch (e) {
+      console.warn('Share error:', e);
+    }
+  };
+
+  const confirmDeletePlaylist = () => {
+    if (!playlist) return;
+    Alert.alert(
+      'Delete Playlist',
+      `Are you sure you want to delete "${playlist.title}"? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await deletePlaylist(playlist.id);
+            if (ok) {
+              router.back();
+            } else {
+              Alert.alert('Error', 'Could not delete playlist.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleMenuPress = () => {
+    const options: AlertButton[] = [
+      {
+        text: 'Share Playlist',
+        onPress: () => {
+          handleShare();
+        },
+      },
+    ];
+    if (isOwner) {
+      options.push({
+        text: 'Delete Playlist',
+        style: 'destructive',
+        onPress: confirmDeletePlaylist,
+      });
+    }
+    options.push({ text: 'Cancel', style: 'cancel' });
+
+    Alert.alert(title, undefined, options);
+  };
+
+  const handleRemoveTrack = (track: any) => {
+    if (!playlist) return;
+    Alert.alert(
+      'Remove Song',
+      `Remove "${track.title}" from this playlist?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await removeTrackFromPlaylist(playlist.id, track.id);
+            if (ok) {
+              setPlaylist((prev) =>
+                prev ? { ...prev, tracks: prev.tracks.filter((t) => t.id !== track.id) } : null
+              );
+            } else {
+              Alert.alert('Error', 'Could not remove track.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   async function handlePlayAll() {
     if (activeTracks.length === 0) return;
     await loadAndPlay(activeTracks[0], activeTracks);
@@ -119,7 +208,7 @@ export default function PlaylistDetailScreen() {
         <ThemedText variant="titleMedium" fontWeight="bold" style={{ flex: 1, textAlign: 'center' }}>
           {isLikedPlaylist ? 'Liked Songs' : 'Playlist'}
         </ThemedText>
-        <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+        <TouchableOpacity onPress={handleMenuPress} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Ionicons name="ellipsis-horizontal" size={24} color={colors.primaryText} />
         </TouchableOpacity>
       </View>
@@ -214,14 +303,21 @@ export default function PlaylistDetailScreen() {
                 {formatDuration(track.duration)}
               </ThemedText>
 
-              {isLikedPlaylist && (
+              {isLikedPlaylist ? (
                 <TouchableOpacity
                   onPress={() => handleUnlike(i)}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   <Ionicons name="heart" size={20} color="#E91E63" />
                 </TouchableOpacity>
-              )}
+              ) : isOwner ? (
+                <TouchableOpacity
+                  onPress={() => handleRemoveTrack(track)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="trash-outline" size={18} color={colors.hint} />
+                </TouchableOpacity>
+              ) : null}
             </TouchableOpacity>
           ))
         )}

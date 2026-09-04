@@ -23,6 +23,7 @@ import { useLikesStore } from '@/store/likesStore';
 import { useAuthStore } from '@/store/authStore';
 import { ThemedText } from '@/components/ui/ThemedText';
 import { Spacing, Radii, FontSizes, FontWeights } from '@/constants/Theme';
+import { AddToPlaylistSheet } from '@/components/music/AddToPlaylistSheet';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const ARTWORK_SIZE = Math.min(SCREEN_W - Spacing.lg * 2, SCREEN_H * 0.40);
@@ -70,6 +71,7 @@ export default function PlayerScreen() {
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [scrubPositionMs, setScrubPositionMs] = useState(0);
   const [showQueue, setShowQueue] = useState(false);
+  const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
 
   const trackLayoutRef = useRef<{ pageX: number; width: number }>({
     pageX: Spacing.lg,
@@ -375,12 +377,12 @@ export default function PlayerScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.actionBtn}
-                onPress={handleToggleLike}
+                onPress={() => setShowAddToPlaylist(true)}
                 activeOpacity={0.7}
               >
-                <Ionicons name={isLiked ? 'heart' : 'add-circle-outline'} size={22} color={isLiked ? '#E91E63' : colors.secondaryText} />
-                <Text style={{ color: isLiked ? '#E91E63' : colors.secondaryText, fontSize: FontSizes.labelSmall, fontFamily: 'DMSans_400Regular', marginTop: 4 }}>
-                  {isLiked ? 'Liked' : 'Add'}
+                <Ionicons name="bookmark-outline" size={22} color={colors.secondaryText} />
+                <Text style={{ color: colors.secondaryText, fontSize: FontSizes.labelSmall, fontFamily: 'DMSans_400Regular', marginTop: 4 }}>
+                  Add
                 </Text>
               </TouchableOpacity>
             </View>
@@ -543,6 +545,13 @@ export default function PlayerScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Add To Playlist Sheet */}
+      <AddToPlaylistSheet
+        visible={showAddToPlaylist}
+        track={currentTrack}
+        onClose={() => setShowAddToPlaylist(false)}
+      />
     </SafeAreaView>
     </LinearGradient>
   );
