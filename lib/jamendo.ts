@@ -43,10 +43,19 @@ async function jamendoGet<T>(
     ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
   });
 
-  const res = await fetch(`${JAMENDO_BASE_URL}/${endpoint}?${query}`);
-  if (!res.ok) throw new Error(`Jamendo API error: ${res.status}`);
-  const json = await res.json();
-  return json.results as T[];
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 9000);
+
+  try {
+    const res = await fetch(`${JAMENDO_BASE_URL}/${endpoint}?${query}`, {
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`Jamendo API error: ${res.status}`);
+    const json = await res.json();
+    return (json.results ?? []) as T[];
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 // Search tracks by text query
@@ -69,13 +78,28 @@ export async function getTracksByTag(tag: string, limit = 20): Promise<JamendoTr
   });
 }
 
-// Get popular tracks (for New Releases / Featured)
+// Get popular tracks (for Quick Picks / Fallback)
 export async function getPopularTracks(limit = 20): Promise<JamendoTrack[]> {
   return jamendoGet<JamendoTrack>('tracks', {
     order: 'popularity_week',
     limit,
     audioformat: 'mp32',
   });
+}
+
+// Get latest new releases
+export async function getNewReleases(limit = 20): Promise<JamendoTrack[]> {
+  try {
+    const tracks = await jamendoGet<JamendoTrack>('tracks', {
+      order: 'releasedate_desc',
+      limit,
+      audioformat: 'mp32',
+    });
+    if (tracks && tracks.length > 0) return tracks;
+  } catch (e) {
+    console.warn('[jamendo] getNewReleases fallback to popular:', e);
+  }
+  return getPopularTracks(limit);
 }
 
 // Search artists

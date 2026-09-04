@@ -21,10 +21,22 @@ export function asDbTrack(value: unknown): DbTrackRow | null {
 
 export function mapDbTrack(row: DbTrackRow): Track {
   const artist = Array.isArray(row.artists) ? row.artists[0] : row.artists;
+  let artistName = artist?.name;
+  let trackTitle = row.title;
+
+  // Fallback: if artist name is missing and title has "Artist - Song", extract both
+  if (!artistName && row.title && row.title.includes(' - ')) {
+    const parts = row.title.split(' - ');
+    if (parts.length >= 2 && parts[0].trim().length > 0) {
+      artistName = parts[0].trim();
+      trackTitle = parts.slice(1).join(' - ').trim() || row.title;
+    }
+  }
+
   return {
     id: row.id,
-    title: row.title,
-    artistName: artist?.name ?? 'Unknown Artist',
+    title: trackTitle,
+    artistName: artistName ?? 'Unknown Artist',
     duration: row.duration_seconds ?? 0,
     audioUrl: row.audio_url ?? '',
     coverUrl: row.cover_url,
