@@ -24,6 +24,7 @@ import { useAuthStore } from '@/store/authStore';
 import { uploadAndPublishTrack } from '@/services/artist';
 import { usePlayerStore } from '@/store/playerStore';
 import { showAlert, showCustomDialog } from '@/store/dialogStore';
+import { probeAudioDuration } from '@/lib/audioPlayer';
 
 const AVAILABLE_GENRES = [
   'Pop',
@@ -44,6 +45,13 @@ function formatBytes(bytes?: number): string {
   return `${mb.toFixed(1)} MB`;
 }
 
+function formatMmSs(totalSec: number): string {
+  if (!totalSec || isNaN(totalSec) || totalSec < 0) return '0:00';
+  const m = Math.floor(totalSec / 60);
+  const s = Math.floor(totalSec % 60);
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
 export default function ArtistUploadScreen() {
   const colors = useThemeColors();
   const router = useRouter();
@@ -54,6 +62,8 @@ export default function ArtistUploadScreen() {
   const [title, setTitle] = useState('');
   const [selectedGenres, setSelectedGenres] = useState<string[]>(['pop']);
   const [durationInput, setDurationInput] = useState('180');
+  const [isDetectingDuration, setIsDetectingDuration] = useState(false);
+  const [detectedDuration, setDetectedDuration] = useState<number | null>(null);
 
   // Selected Assets
   const [audioAsset, setAudioAsset] = useState<{
@@ -98,9 +108,27 @@ export default function ArtistUploadScreen() {
           const autoTitle = asset.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
           setTitle(autoTitle);
         }
+
+        // Auto-detect duration from the selected audio file
+        setIsDetectingDuration(true);
+        try {
+          const seconds = await probeAudioDuration(asset.uri);
+          if (seconds && seconds > 0) {
+            setDurationInput(String(seconds));
+            setDetectedDuration(seconds);
+          }
+        } catch (durErr) {
+          console.warn('[upload] Auto-detect duration error:', durErr);
+        } finally {
+          setIsDetectingDuration(false);
+        }
       }
     } catch (err: any) {
-      Alert.alert('Audio Selection Error', err?.message || 'Failed to select audio file.');
+      showAlert({
+        title: 'Audio Selection Error',
+        message: err?.message || 'Failed to select audio file.',
+        icon: 'alert-circle-outline',
+      });
     }
   };
 
@@ -117,7 +145,11 @@ export default function ArtistUploadScreen() {
         setCoverUri(result.assets[0].uri);
       }
     } catch (err: any) {
-      Alert.alert('Cover Selection Error', err?.message || 'Failed to select image.');
+      showAlert({
+        title: 'Cover Selection Error',
+        message: err?.message || 'Failed to select image.',
+        icon: 'image-outline',
+      });
     }
   };
 
@@ -308,13 +340,47 @@ export default function ArtistUploadScreen() {
 
           {/* Duration Input */}
           <View style={{ marginTop: Spacing.md }}>
-            <ThemedText variant="labelLarge" fontWeight="bold">
-              Duration (seconds)
-            </ThemedText>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: Spacing.xs,
+              }}
+            >
+              <ThemedText variant="labelLarge" fontWeight="bold">
+                Duration (seconds)
+              </ThemedText>
+              {isDetectingDuration ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <ThemedText variant="labelSmall" color={colors.primary}>
+                    Detecting duration...
+                  </ThemedText>
+                </View>
+              ) : durationInput ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="time-outline" size={14} color={colors.primary} />
+                  <ThemedText variant="labelSmall" color={colors.primary} fontWeight="bold">
+                    {formatMmSs(parseInt(durationInput, 10) || 0)}
+                  </ThemedText>
+                  {detectedDuration && parseInt(durationInput, 10) === detectedDuration ? (
+                    <ThemedText variant="labelSmall" color={colors.secondaryText}>
+                      • auto-detected
+                    </ThemedText>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
             <TextInput
               value={durationInput}
-              onChangeText={setDurationInput}
-              placeholder="180"
+              onChangeText={(val) => {
+                setDurationInput(val);
+                if (detectedDuration && parseInt(val, 10) !== detectedDuration) {
+                  setDetectedDuration(null);
+                }
+              }}
+              placeholder="e.g. 180"
               placeholderTextColor={colors.hint}
               keyboardType="numeric"
               style={[

@@ -285,3 +285,83 @@ class SafeAudioPlayer {
 }
 
 export const safeAudioPlayer = new SafeAudioPlayer();
+
+/**
+ * Probes the duration of an audio file in seconds.
+ * Tries expo-av first (safe, fast header probe without audio playback),
+ * then expo-audio, safely cleaning up resources.
+ */
+export async function probeAudioDuration(uri: string): Promise<number | null> {
+  // 1. Try expo-av
+  try {
+    const { Audio } = require('expo-av');
+    if (Audio?.Sound) {
+      const { sound, status } = await Audio.Sound.createAsync(
+        { uri },
+        { shouldPlay: false }
+      );
+      let durationSec: number | null = null;
+      if (
+        status &&
+        status.isLoaded &&
+        typeof status.durationMillis === 'number' &&
+        status.durationMillis > 0
+      ) {
+        durationSec = Math.round(status.durationMillis / 1000);
+      }
+      await sound.unloadAsync().catch(() => {});
+      if (durationSec && durationSec > 0) {
+        return durationSec;
+      }
+    }
+  } catch (err) {
+    console.warn('[probeAudioDuration] expo-av probe error:', err);
+  }
+
+  // 2. Try expo-audio
+  try {
+    const expoAudio = require('expo-audio');
+    if (expoAudio?.createAudioPlayer) {
+      const player = expoAudio.createAudioPlayer(uri);
+      let durationSec: number | null = null;
+      if (typeof player.duration === 'number' && player.duration > 0) {
+        durationSec = Math.round(player.duration);
+      } else {
+        durationSec = await new Promise<number | null>((resolve) => {
+          let resolved = false;
+          let sub: any = null;
+          const timer = setTimeout(() => {
+            if (!resolved) {
+              resolved = true;
+              if (sub && typeof sub.remove === 'function') sub.remove();
+              resolve(null);
+            }
+          }, 1500);
+
+          if (player.addListener) {
+            sub = player.addListener('playbackStatusUpdate', (status: any) => {
+              if (status?.duration && status.duration > 0 && !resolved) {
+                resolved = true;
+                clearTimeout(timer);
+                if (sub && typeof sub.remove === 'function') sub.remove();
+                resolve(Math.round(status.duration));
+              }
+            });
+          }
+        });
+      }
+      try {
+        if (typeof player.remove === 'function') {
+          player.remove();
+        }
+      } catch {}
+      if (durationSec && durationSec > 0) {
+        return durationSec;
+      }
+    }
+  } catch (err) {
+    console.warn('[probeAudioDuration] expo-audio probe error:', err);
+  }
+
+  return null;
+}
